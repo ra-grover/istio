@@ -1,0 +1,39 @@
+name: build-publish
+
+on:
+  workflow_dispatch:
+  push:
+    paths-ignore:
+      - '**.md'
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Docker build and publish
+    runs-on: eg-default
+    env:
+      RELEASE_REGISTRY: kumo-docker-release-local.artylab.expedia.biz
+      APP_NAME: istiod-debug
+    steps:
+      # For multi-platform builds
+      - name: Set up Docker Buildx
+        uses: actions/docker-setup-buildx-action@v2
+      # Checkout
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Make
+        run: |
+          make DEBUG=1 docker.pilot
+      # Arty Login
+      - name: Log in to ${{ env.RELEASE_REGISTRY }}
+        uses: actions/docker-login-action@v2
+        with:
+          registry: ${{ env.RELEASE_REGISTRY }}
+          username: ${{ secrets.KUMO_ARTY_SA_USER }}
+          password: ${{ secrets.KUMO_ARTY_SA_PASSWORD }}
+      - name: Docker push
+        run: |
+          docker image ls
