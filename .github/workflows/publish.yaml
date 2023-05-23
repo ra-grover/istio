@@ -7,6 +7,7 @@ on:
       - '**.md'
     branches:
       - master
+      - v1.17.1
 
 jobs:
   build:
@@ -26,6 +27,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Make
         run: |
+          git config --global --add safe.directory /
+          git config --global --add safe.directory /work
           make DEBUG=1 docker.pilot
       # Arty Login
       - name: Log in to ${{ env.RELEASE_REGISTRY }}
