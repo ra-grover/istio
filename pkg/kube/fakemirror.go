@@ -17,6 +17,7 @@ package kube
 import (
 	"context"
 	"reflect"
+	"time"
 
 	gogoproto "github.com/gogo/protobuf/proto" // nolint: depguard
 	corev1 "k8s.io/api/core/v1"
@@ -58,7 +59,7 @@ func (c *untypedMirror) OnAdd(obj any) {
 		return
 	}
 	log.Debugf("Mirroring ADD %s/%s", meta.GetName(), meta.GetName())
-	c.queue.Push(&queue.RagTask{Task: func() error {
+	c.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 		return c.Create(meta.GetNamespace(), res)
 	}})
 }
@@ -72,7 +73,7 @@ func (c *untypedMirror) OnUpdate(_, obj any) {
 	}
 	res.SetResourceVersion("")
 	log.Debugf("Mirroring UPDATE %s/%s", meta.GetName(), meta.GetName())
-	c.queue.Push(&queue.RagTask{Task: func() error {
+	c.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 		return c.Create(meta.GetNamespace(), res)
 	}})
 }
@@ -80,7 +81,7 @@ func (c *untypedMirror) OnUpdate(_, obj any) {
 func (c *untypedMirror) OnDelete(obj any) {
 	meta := obj.(metav1.Object)
 	log.Debugf("Mirroring DELETE %s/%s", meta.GetName(), meta.GetName())
-	c.queue.Push(&queue.RagTask{Task: func() error {
+	c.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 		return c.Create(meta.GetNamespace(), meta.GetName())
 	}})
 }

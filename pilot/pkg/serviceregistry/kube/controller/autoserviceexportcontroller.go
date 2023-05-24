@@ -86,7 +86,7 @@ func (c *autoServiceExportController) onServiceAdd(svc *v1.Service) {
 	if svc == nil {
 		return
 	}
-	c.queue.Push(&queue.RagTask{Task: func() error {
+	c.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 		if !c.mcsSupported {
 			// Don't create ServiceExport if MCS is not supported on the cluster.
 			log.Debugf("%s ignoring added Service, since !mcsSupported", c.logPrefix())

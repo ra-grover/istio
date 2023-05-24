@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	listerv1 "k8s.io/client-go/listers/core/v1"
+	"time"
 
 	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pilot/pkg/model"
@@ -53,7 +54,7 @@ func (c *Controller) initDiscoveryNamespaceHandlers(
 		AddFunc: func(ns *v1.Namespace) {
 			incrementEvent(otype, "add")
 			if discoveryNamespacesFilter.NamespaceCreated(ns.ObjectMeta) {
-				c.queue.Push(&queue.RagTask{Task: func() error {
+				c.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 					c.handleSelectedNamespace(endpointMode, ns.Name)
 					// This is necessary because namespace handled by discoveryNamespacesFilter may take some time,
 					// if a CR is processed before discoveryNamespacesFilter takes effect, it will be ignored.
@@ -88,7 +89,7 @@ func (c *Controller) initDiscoveryNamespaceHandlers(
 					}
 					return nil
 				}
-				c.queue.Push(&queue.RagTask{Task: handleFunc, Type: otype + "-update"})
+				c.queue.Push(&queue.RagTask{Start: time.Now(), Task: handleFunc, Type: otype + "-update"})
 				c.queue.IncrementType(otype + "-update")
 			}
 		},
@@ -114,7 +115,7 @@ func (c *Controller) initMeshWatcherHandler(
 
 		for _, nsName := range newSelectedNamespaces {
 			nsName := nsName // need to shadow variable to ensure correct value when evaluated inside the closure below
-			c.queue.Push(&queue.RagTask{Task: func() error {
+			c.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 				c.handleSelectedNamespace(endpointMode, nsName)
 				return nil
 			}, Type: "mesh-create"})
@@ -123,7 +124,7 @@ func (c *Controller) initMeshWatcherHandler(
 
 		for _, nsName := range deselectedNamespaces {
 			nsName := nsName // need to shadow variable to ensure correct value when evaluated inside the closure below
-			c.queue.Push(&queue.RagTask{Task: func() error {
+			c.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 				c.handleDeselectedNamespace(kubeClient, endpointMode, nsName)
 				return nil
 			}, Type: "mesh-delete"})
@@ -132,7 +133,7 @@ func (c *Controller) initMeshWatcherHandler(
 
 		if features.EnableEnhancedResourceScoping && (len(newSelectedNamespaces) > 0 || len(deselectedNamespaces) > 0) {
 
-			c.queue.Push(&queue.RagTask{Task: func() error {
+			c.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 				c.opts.XDSUpdater.ConfigUpdate(&model.PushRequest{
 					Full:   true,
 					Reason: []model.TriggerReason{model.GlobalUpdate},

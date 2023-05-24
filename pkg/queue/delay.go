@@ -273,7 +273,7 @@ func (d *delayQueue) work(stop <-chan struct{}) (stopped chan struct{}) {
 			case t := <-d.execute:
 				if err := t.do(); err != nil {
 					if t.retries < maxTaskRetry {
-						d.Push(&RagTask{Task: t.do, Type: "delayed"})
+						d.Push(&RagTask{Start: time.Now(), Task: t.do, Type: "delayed"})
 						d.IncrementType("delayed")
 						t.retries++
 						log.Warnf("Work item handle failed: %v %d times, retry it", err, t.retries)

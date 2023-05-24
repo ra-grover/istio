@@ -15,7 +15,6 @@
 package queue
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -25,8 +24,9 @@ import (
 )
 
 type RagTask struct {
-	Task func() error
-	Type string
+	Task  func() error
+	Type  string
+	Start time.Time
 }
 
 // Task to be performed.
@@ -57,6 +57,16 @@ type queueImpl struct {
 	id              string
 	TypeCounterMap  map[string]int
 	typeSyncCounter sync.Map
+	queueLastInfoed time.Time
+}
+
+func (q *queueImpl) printQueue() {
+	log.Infof("Starting evaluation of queue:")
+	q.typeSyncCounter.Range(func(key, value interface{}) bool {
+		log.Infof("%s ->  %d", key.(string), value.(int))
+		return true
+	})
+	log.Infof("Finished evaluation of queue:")
 }
 
 func (q *queueImpl) IncrementType(typeObj string) int {
@@ -122,7 +132,7 @@ func (q *queueImpl) get() (task *RagTask, shutdown bool) {
 	}
 	task = q.tasks[0]
 	// Slicing will not free the underlying elements of the array, so explicitly clear them out here
-	q.tasks[0].Task = nil
+	q.tasks[0] = nil
 	q.tasks = q.tasks[1:]
 	return task, false
 }
@@ -135,8 +145,13 @@ func (q *queueImpl) processNextItem() bool {
 	}
 
 	// Run the task.
-	log.Infof("Dequeuing task %s ", task.Type)
+	log.Infof("Dequeuing task %s , process time %d", task.Type, time.Since(task.Start).Microseconds())
 	q.DecrementType(task.Type)
+
+	if time.Since(q.queueLastInfoed).Seconds() > 20 {
+		q.printQueue()
+		q.queueLastInfoed = time.Now()
+	}
 
 	if task.Task == nil {
 		log.Infof("Task came to be nil with type %s", task.Type)
@@ -168,28 +183,28 @@ func (q *queueImpl) Run(stop <-chan struct{}) {
 		q.closing = true
 		q.cond.L.Unlock()
 	}()
-	ticker := time.NewTicker(20 * time.Second)
-	printMap := func() {
-		log.Infof("Starting evaluation of queue:")
-		q.typeSyncCounter.Range(func(key, value interface{}) bool {
-			log.Infof("%s ->  %d", key.(string), value.(int))
-			return true
-		})
-		log.Infof("Finished evaluation of queue:")
-		fmt.Println()
-	}
+	//ticker := time.NewTicker(20 * time.Second)
+	//printMap := func() {
+	//	log.Infof("Starting evaluation of queue:")
+	//	q.typeSyncCounter.Range(func(key, value interface{}) bool {
+	//		log.Infof("%s ->  %d", key.(string), value.(int))
+	//		return true
+	//	})
+	//	log.Infof("Finished evaluation of queue:")
+	//	fmt.Println()
+	//}
 
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				printMap()
-			case <-stop:
-				ticker.Stop()
-				return
-			}
-		}
-	}()
+	//go func() {
+	//	for {
+	//		select {
+	//		case <-ticker.C:
+	//			printMap()
+	//		case <-stop:
+	//			ticker.Stop()
+	//			return
+	//		}
+	//	}
+	//}()
 
 	for q.processNextItem() {
 	}

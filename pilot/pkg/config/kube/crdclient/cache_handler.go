@@ -22,6 +22,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"  // import GKE cluster authentication plugin
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc" // import OIDC cluster authentication plugin, e.g. for Tectonic
 	"k8s.io/client-go/tools/cache"
+	"time"
 
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pkg/config"
@@ -111,7 +112,7 @@ func createCacheHandler(cl *Client, schema collection.Schema, i informers.Generi
 			if !cl.beginSync.Load() {
 				return
 			}
-			cl.queue.Push(&queue.RagTask{Task: func() error {
+			cl.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 				return h.onEvent(nil, obj, model.EventAdd)
 			}, Type: kind + "-cache-create"})
 			cl.queue.IncrementType(kind + "-cache-create")
@@ -121,7 +122,7 @@ func createCacheHandler(cl *Client, schema collection.Schema, i informers.Generi
 			if !cl.beginSync.Load() {
 				return
 			}
-			cl.queue.Push(&queue.RagTask{Task: func() error {
+			cl.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 				return h.onEvent(old, cur, model.EventUpdate)
 			}, Type: kind + "-cache-update"})
 			cl.queue.IncrementType(kind + "-cache-update")
@@ -131,7 +132,7 @@ func createCacheHandler(cl *Client, schema collection.Schema, i informers.Generi
 			if !cl.beginSync.Load() {
 				return
 			}
-			cl.queue.Push(&queue.RagTask{Task: func() error {
+			cl.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 				return h.onEvent(nil, obj, model.EventDelete)
 			}, Type: kind + "-cache-delete"})
 			cl.queue.IncrementType(kind + "-cache-delete")

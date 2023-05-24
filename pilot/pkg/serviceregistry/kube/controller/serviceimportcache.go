@@ -18,6 +18,7 @@ import (
 	"istio.io/istio/pkg/queue"
 	"sort"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -109,7 +110,7 @@ func (ic *serviceImportCacheImpl) onServiceEvent(_, curr *model.Service, event m
 
 	// This method is called concurrently from each cluster's queue. Process it in `this` cluster's queue
 	// in order to synchronize event processing.
-	ic.queue.Push(&queue.RagTask{Task: func() error {
+	ic.queue.Push(&queue.RagTask{Start: time.Now(), Task: func() error {
 		namespacedName := namespacedNameForService(curr)
 
 		// Lookup the previous MCS service if there was one.

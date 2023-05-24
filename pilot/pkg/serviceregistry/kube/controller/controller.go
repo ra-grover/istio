@@ -388,7 +388,8 @@ func NewController(kubeClient kubelib.Client, options Options) *Controller {
 		}
 		if shouldEnqueue("Pods", c.beginSync) {
 			c.queue.Push(&queue.RagTask{
-				Type: "pods-update",
+				Start: time.Now(),
+				Type:  "pods-update",
 				Task: func() error {
 					return c.endpoints.onEvent(nil, item, model.EventUpdate)
 				}})
@@ -689,6 +690,7 @@ func (c *Controller) registerHandlers(
 				}
 				c.queue.Push(
 					&queue.RagTask{
+						Start: time.Now(),
 						Task: func() error {
 							return wrappedHandler(nil, obj, model.EventAdd)
 						},
@@ -709,6 +711,7 @@ func (c *Controller) registerHandlers(
 				}
 				c.queue.Push(
 					&queue.RagTask{
+						Start: time.Now(),
 						Task: func() error {
 							return wrappedHandler(old, cur, model.EventUpdate)
 						},
@@ -722,6 +725,7 @@ func (c *Controller) registerHandlers(
 				}
 				c.queue.Push(
 					&queue.RagTask{
+						Start: time.Now(),
 						Task: func() error {
 							return handler(nil, obj, model.EventDelete)
 						},
