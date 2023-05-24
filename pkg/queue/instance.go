@@ -70,18 +70,10 @@ func (q *queueImpl) printQueue() {
 }
 
 func (q *queueImpl) IncrementType(typeObj string) int {
-	key := typeObj
-	newValue, _ := q.typeSyncCounter.LoadOrStore(key, 0)
-	newValue = newValue.(int) + 1
-	q.typeSyncCounter.Store(key, newValue)
 	return 0
 }
 
 func (q *queueImpl) DecrementType(typeObj string) int {
-	key := typeObj
-	newValue, _ := q.typeSyncCounter.LoadOrStore(key, 0)
-	newValue = newValue.(int) - 1
-	q.typeSyncCounter.Store(key, newValue)
 	return 0
 }
 
@@ -146,12 +138,6 @@ func (q *queueImpl) processNextItem() bool {
 
 	// Run the task.
 	log.Infof("Dequeuing task %s , process time %d, queue length: %d", task.Type, time.Since(task.Start).Microseconds(), len(q.tasks))
-	q.DecrementType(task.Type)
-
-	if time.Since(q.queueLastInfoed).Seconds() > 20 {
-		q.printQueue()
-		q.queueLastInfoed = time.Now()
-	}
 
 	if task.Task == nil {
 		log.Infof("Task came to be nil with type %s", task.Type)
