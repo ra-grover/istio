@@ -96,6 +96,7 @@ func NewQueueWithID(errorDelay time.Duration, name string) Instance {
 }
 
 func (q *queueImpl) Push(item *RagTask) {
+	queue.With(nameTag.Value(item.Type)).Increment()
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 	if !q.closing {
@@ -137,6 +138,7 @@ func (q *queueImpl) processNextItem() bool {
 	}
 
 	// Run the task.
+	queue.With(nameTag.Value(task.Type)).Decrement()
 	log.Infof("Dequeuing task %s , process time %d, queue length: %d", task.Type, time.Since(task.Start).Microseconds(), len(q.tasks))
 
 	if task.Task == nil {
