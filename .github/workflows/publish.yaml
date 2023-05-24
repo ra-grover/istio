@@ -5,6 +5,8 @@ on:
   push:
     paths-ignore:
       - '**.md'
+    branches:
+      - v1.17.1
 
 jobs:
   build:

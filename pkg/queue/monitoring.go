@@ -2,7 +2,7 @@ package queue
 
 import "istio.io/pkg/monitoring"
 
-// Const strings for label value.
+// TODO: this is how workqueue from k8s project does it. We should do the same
 const (
 	WorkQueueSubsystem         = "workqueue"
 	DepthKey                   = "depth"
@@ -18,7 +18,7 @@ var (
 	nameTag = monitoring.MustCreateLabel("name")
 
 	queue = monitoring.NewGauge(
-		"queue",
+		"workqueue_deapth",
 		"number of items in the queue.",
 		monitoring.WithLabels(nameTag),
 	)
