@@ -387,9 +387,12 @@ func NewController(kubeClient kubelib.Client, options Options) *Controller {
 			return
 		}
 		if shouldEnqueue("Pods", c.beginSync) {
-			c.queue.Push(func() error {
-				return c.endpoints.onEvent(nil, item, model.EventUpdate)
-			})
+			c.queue.Push(&queue.RagTask{
+				Type: "pods-update",
+				Task: func() error {
+					return c.endpoints.onEvent(nil, item, model.EventUpdate)
+				}})
+			c.queue.IncrementType("pods-update")
 		}
 	})
 	c.registerHandlers(c.pods.informer, "Pods", c.pods.onEvent, c.pods.labelFilter)
@@ -684,9 +687,13 @@ func (c *Controller) registerHandlers(
 				if !shouldEnqueue(otype, c.beginSync) {
 					return
 				}
-				c.queue.Push(func() error {
-					return wrappedHandler(nil, obj, model.EventAdd)
-				})
+				c.queue.Push(
+					&queue.RagTask{
+						Task: func() error {
+							return wrappedHandler(nil, obj, model.EventAdd)
+						},
+						Type: otype + "-create"})
+				c.queue.IncrementType(otype + "-create")
 			},
 			UpdateFunc: func(old, cur any) {
 				if filter != nil {
@@ -700,18 +707,26 @@ func (c *Controller) registerHandlers(
 				if !shouldEnqueue(otype, c.beginSync) {
 					return
 				}
-				c.queue.Push(func() error {
-					return wrappedHandler(old, cur, model.EventUpdate)
-				})
+				c.queue.Push(
+					&queue.RagTask{
+						Task: func() error {
+							return wrappedHandler(old, cur, model.EventUpdate)
+						},
+						Type: otype + "-update"})
+				c.queue.IncrementType(otype + "-update")
 			},
 			DeleteFunc: func(obj any) {
 				incrementEvent(otype, "delete")
 				if !shouldEnqueue(otype, c.beginSync) {
 					return
 				}
-				c.queue.Push(func() error {
-					return handler(nil, obj, model.EventDelete)
-				})
+				c.queue.Push(
+					&queue.RagTask{
+						Task: func() error {
+							return handler(nil, obj, model.EventDelete)
+						},
+						Type: otype + "-delete"})
+				c.queue.IncrementType(otype + "-delete")
 			},
 		})
 }

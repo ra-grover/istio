@@ -15,6 +15,7 @@
 package queue
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -23,28 +24,55 @@ import (
 	"istio.io/pkg/log"
 )
 
+type RagTask struct {
+	Task func() error
+	Type string
+}
+
 // Task to be performed.
 type Task func() error
 
 // Instance of work tickets processed using a rate-limiting loop
 type Instance interface {
 	// Push a task.
-	Push(task Task)
+	Push(task *RagTask)
 	// Run the loop until a signal on the channel
 	Run(<-chan struct{})
 
 	// Closed returns a chan that will be signaled when the Instance has stopped processing tasks.
 	Closed() <-chan struct{}
+
+	IncrementType(typeObj string) int
+
+	DecrementType(typeObj string) int
 }
 
 type queueImpl struct {
-	delay     time.Duration
-	tasks     []Task
-	cond      *sync.Cond
-	closing   bool
-	closed    chan struct{}
-	closeOnce *sync.Once
-	id        string
+	delay           time.Duration
+	tasks           []*RagTask
+	cond            *sync.Cond
+	closing         bool
+	closed          chan struct{}
+	closeOnce       *sync.Once
+	id              string
+	TypeCounterMap  map[string]int
+	typeSyncCounter sync.Map
+}
+
+func (q *queueImpl) IncrementType(typeObj string) int {
+	key := typeObj
+	newValue, _ := q.typeSyncCounter.LoadOrStore(key, 0)
+	newValue = newValue.(int) + 1
+	q.typeSyncCounter.Store(key, newValue)
+	return 0
+}
+
+func (q *queueImpl) DecrementType(typeObj string) int {
+	key := typeObj
+	newValue, _ := q.typeSyncCounter.LoadOrStore(key, 0)
+	newValue = newValue.(int) - 1
+	q.typeSyncCounter.Store(key, newValue)
+	return 0
 }
 
 // NewQueue instantiates a queue with a processing function
@@ -54,17 +82,18 @@ func NewQueue(errorDelay time.Duration) Instance {
 
 func NewQueueWithID(errorDelay time.Duration, name string) Instance {
 	return &queueImpl{
-		delay:     errorDelay,
-		tasks:     make([]Task, 0),
-		closing:   false,
-		closed:    make(chan struct{}),
-		closeOnce: &sync.Once{},
-		cond:      sync.NewCond(&sync.Mutex{}),
-		id:        name,
+		delay:          errorDelay,
+		tasks:          make([]*RagTask, 0),
+		closing:        false,
+		closed:         make(chan struct{}),
+		closeOnce:      &sync.Once{},
+		cond:           sync.NewCond(&sync.Mutex{}),
+		id:             name,
+		TypeCounterMap: map[string]int{},
 	}
 }
 
-func (q *queueImpl) Push(item Task) {
+func (q *queueImpl) Push(item *RagTask) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 	if !q.closing {
@@ -79,7 +108,7 @@ func (q *queueImpl) Closed() <-chan struct{} {
 
 // get blocks until it can return a task to be processed. If shutdown = true,
 // the processing go routine should stop.
-func (q *queueImpl) get() (task Task, shutdown bool) {
+func (q *queueImpl) get() (task *RagTask, shutdown bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 	// wait for closing to be set, or a task to be pushed
@@ -93,7 +122,7 @@ func (q *queueImpl) get() (task Task, shutdown bool) {
 	}
 	task = q.tasks[0]
 	// Slicing will not free the underlying elements of the array, so explicitly clear them out here
-	q.tasks[0] = nil
+	q.tasks[0].Task = nil
 	q.tasks = q.tasks[1:]
 	return task, false
 }
@@ -106,7 +135,15 @@ func (q *queueImpl) processNextItem() bool {
 	}
 
 	// Run the task.
-	if err := task(); err != nil {
+	log.Infof("Dequeuing task %s ", task.Type)
+	q.DecrementType(task.Type)
+
+	if task.Task == nil {
+		log.Infof("Task came to be nil with type %s", task.Type)
+		return true
+	}
+
+	if err := task.Task(); err != nil {
 		delay := q.delay
 		log.Infof("Work item handle failed (%v), retry after delay %v", err, delay)
 		time.AfterFunc(delay, func() {
@@ -130,6 +167,28 @@ func (q *queueImpl) Run(stop <-chan struct{}) {
 		q.cond.Signal()
 		q.closing = true
 		q.cond.L.Unlock()
+	}()
+	ticker := time.NewTicker(20 * time.Second)
+	printMap := func() {
+		log.Infof("Starting evaluation of queue:")
+		q.typeSyncCounter.Range(func(key, value interface{}) bool {
+			log.Infof("%s ->  %d", key.(string), value.(int))
+			return true
+		})
+		log.Infof("Finished evaluation of queue:")
+		fmt.Println()
+	}
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				printMap()
+			case <-stop:
+				ticker.Stop()
+				return
+			}
+		}
 	}()
 
 	for q.processNextItem() {

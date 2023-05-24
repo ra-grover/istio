@@ -58,9 +58,9 @@ func (c *untypedMirror) OnAdd(obj any) {
 		return
 	}
 	log.Debugf("Mirroring ADD %s/%s", meta.GetName(), meta.GetName())
-	c.queue.Push(func() error {
+	c.queue.Push(&queue.RagTask{Task: func() error {
 		return c.Create(meta.GetNamespace(), res)
-	})
+	}})
 }
 
 func (c *untypedMirror) OnUpdate(_, obj any) {
@@ -72,17 +72,17 @@ func (c *untypedMirror) OnUpdate(_, obj any) {
 	}
 	res.SetResourceVersion("")
 	log.Debugf("Mirroring UPDATE %s/%s", meta.GetName(), meta.GetName())
-	c.queue.Push(func() error {
-		return c.Update(meta.GetNamespace(), res)
-	})
+	c.queue.Push(&queue.RagTask{Task: func() error {
+		return c.Create(meta.GetNamespace(), res)
+	}})
 }
 
 func (c *untypedMirror) OnDelete(obj any) {
 	meta := obj.(metav1.Object)
 	log.Debugf("Mirroring DELETE %s/%s", meta.GetName(), meta.GetName())
-	c.queue.Push(func() error {
-		return c.Delete(meta.GetNamespace(), meta.GetName())
-	})
+	c.queue.Push(&queue.RagTask{Task: func() error {
+		return c.Create(meta.GetNamespace(), meta.GetName())
+	}})
 }
 
 func (c *untypedMirror) do(ns string, method string, args ...any) []reflect.Value {

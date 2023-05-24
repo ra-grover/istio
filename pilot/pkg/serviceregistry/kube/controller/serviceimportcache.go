@@ -15,6 +15,7 @@
 package controller
 
 import (
+	"istio.io/istio/pkg/queue"
 	"sort"
 	"strings"
 
@@ -108,7 +109,7 @@ func (ic *serviceImportCacheImpl) onServiceEvent(_, curr *model.Service, event m
 
 	// This method is called concurrently from each cluster's queue. Process it in `this` cluster's queue
 	// in order to synchronize event processing.
-	ic.queue.Push(func() error {
+	ic.queue.Push(&queue.RagTask{Task: func() error {
 		namespacedName := namespacedNameForService(curr)
 
 		// Lookup the previous MCS service if there was one.
@@ -139,7 +140,8 @@ func (ic *serviceImportCacheImpl) onServiceEvent(_, curr *model.Service, event m
 		mcsService := ic.genMCSService(curr, mcsHost, vips)
 		ic.addOrUpdateService(nil, nil, mcsService, event, false)
 		return nil
-	})
+	}, Type: "msc-service-update"})
+	ic.queue.IncrementType("msc-service-update")
 }
 
 func (ic *serviceImportCacheImpl) onServiceImportEvent(_, obj any, event model.Event) error {

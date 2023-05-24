@@ -86,7 +86,7 @@ func (c *autoServiceExportController) onServiceAdd(svc *v1.Service) {
 	if svc == nil {
 		return
 	}
-	c.queue.Push(func() error {
+	c.queue.Push(&queue.RagTask{Task: func() error {
 		if !c.mcsSupported {
 			// Don't create ServiceExport if MCS is not supported on the cluster.
 			log.Debugf("%s ignoring added Service, since !mcsSupported", c.logPrefix())
@@ -101,7 +101,9 @@ func (c *autoServiceExportController) onServiceAdd(svc *v1.Service) {
 		}
 
 		return c.createServiceExportIfNotPresent(svc)
-	})
+	}, Type: "service-create"})
+	c.queue.IncrementType("service-create")
+
 }
 
 func (c *autoServiceExportController) Run(stopCh <-chan struct{}) {

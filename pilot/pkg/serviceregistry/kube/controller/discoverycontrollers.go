@@ -16,6 +16,7 @@ package controller
 
 import (
 	"github.com/hashicorp/go-multierror"
+	"istio.io/istio/pkg/queue"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	listerv1 "k8s.io/client-go/listers/core/v1"
@@ -52,7 +53,7 @@ func (c *Controller) initDiscoveryNamespaceHandlers(
 		AddFunc: func(ns *v1.Namespace) {
 			incrementEvent(otype, "add")
 			if discoveryNamespacesFilter.NamespaceCreated(ns.ObjectMeta) {
-				c.queue.Push(func() error {
+				c.queue.Push(&queue.RagTask{Task: func() error {
 					c.handleSelectedNamespace(endpointMode, ns.Name)
 					// This is necessary because namespace handled by discoveryNamespacesFilter may take some time,
 					// if a CR is processed before discoveryNamespacesFilter takes effect, it will be ignored.
@@ -63,7 +64,8 @@ func (c *Controller) initDiscoveryNamespaceHandlers(
 						})
 					}
 					return nil
-				})
+				}, Type: otype + "-add"})
+				c.queue.IncrementType(otype + "-add")
 			}
 		},
 		UpdateFunc: func(old, new *v1.Namespace) {
@@ -86,7 +88,8 @@ func (c *Controller) initDiscoveryNamespaceHandlers(
 					}
 					return nil
 				}
-				c.queue.Push(handleFunc)
+				c.queue.Push(&queue.RagTask{Task: handleFunc, Type: otype + "-update"})
+				c.queue.IncrementType(otype + "-update")
 			}
 		},
 		DeleteFunc: func(ns *v1.Namespace) {
@@ -111,28 +114,32 @@ func (c *Controller) initMeshWatcherHandler(
 
 		for _, nsName := range newSelectedNamespaces {
 			nsName := nsName // need to shadow variable to ensure correct value when evaluated inside the closure below
-			c.queue.Push(func() error {
+			c.queue.Push(&queue.RagTask{Task: func() error {
 				c.handleSelectedNamespace(endpointMode, nsName)
 				return nil
-			})
+			}, Type: "mesh-create"})
+			c.queue.IncrementType("mesh-create")
 		}
 
 		for _, nsName := range deselectedNamespaces {
 			nsName := nsName // need to shadow variable to ensure correct value when evaluated inside the closure below
-			c.queue.Push(func() error {
+			c.queue.Push(&queue.RagTask{Task: func() error {
 				c.handleDeselectedNamespace(kubeClient, endpointMode, nsName)
 				return nil
-			})
+			}, Type: "mesh-delete"})
+			c.queue.IncrementType("mesh-delete")
 		}
 
 		if features.EnableEnhancedResourceScoping && (len(newSelectedNamespaces) > 0 || len(deselectedNamespaces) > 0) {
-			c.queue.Push(func() error {
+
+			c.queue.Push(&queue.RagTask{Task: func() error {
 				c.opts.XDSUpdater.ConfigUpdate(&model.PushRequest{
 					Full:   true,
 					Reason: []model.TriggerReason{model.GlobalUpdate},
 				})
 				return nil
-			})
+			}, Type: "mesh-global-update"})
+			c.queue.IncrementType("mesh-global-update")
 		}
 	})
 }

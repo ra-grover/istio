@@ -693,11 +693,12 @@ func (s *Controller) queueEdsEvent(keys map[instancesKey]struct{}, edsFn func(ke
 	// wait for the cache update finished
 	waitCh := make(chan struct{})
 	// trigger update eds endpoint shards
-	s.edsQueue.Push(func() error {
+	s.edsQueue.Push(&queue.RagTask{Type: "edsshard" + "-update", Task: func() error {
 		defer close(waitCh)
 		edsFn(keys)
 		return nil
-	})
+	}})
+	s.edsQueue.IncrementType("edsshard" + "-update")
 	select {
 	case <-waitCh:
 		return

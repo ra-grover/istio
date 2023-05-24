@@ -432,10 +432,11 @@ func (c *Controller) periodicWorkloadEntryCleanup(stopCh <-chan struct{}) {
 			for _, wle := range wles {
 				wle := wle
 				if c.shouldCleanupEntry(wle) {
-					c.cleanupQueue.Push(func() error {
+					c.cleanupQueue.Push(&queue.RagTask{Type: "workloadentry-cleanup", Task: func() error {
 						c.cleanupEntry(wle)
 						return nil
-					})
+					}})
+					c.cleanupQueue.IncrementType("workloadentry-cleanup")
 				}
 			}
 		case <-stopCh:

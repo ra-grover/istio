@@ -110,7 +110,8 @@ func (s *StatusSyncer) runUpdateStatus(stop <-chan struct{}) {
 		}
 	}
 	err := wait.PollUntil(updateInterval, func() (bool, error) {
-		s.queue.Push(s.onEvent)
+		s.queue.Push(&queue.RagTask{Task: s.onEvent, Type: "ingress-updatev1"})
+		s.queue.IncrementType("ingress-updatev1")
 		return false, nil
 	}, stop)
 	if err != nil {

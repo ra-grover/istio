@@ -15,6 +15,7 @@
 package crdclient
 
 import (
+	"istio.io/istio/pkg/queue"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
@@ -110,27 +111,30 @@ func createCacheHandler(cl *Client, schema collection.Schema, i informers.Generi
 			if !cl.beginSync.Load() {
 				return
 			}
-			cl.queue.Push(func() error {
+			cl.queue.Push(&queue.RagTask{Task: func() error {
 				return h.onEvent(nil, obj, model.EventAdd)
-			})
+			}, Type: kind + "-cache-create"})
+			cl.queue.IncrementType(kind + "-cache-create")
 		},
 		UpdateFunc: func(old, cur any) {
 			incrementEvent(kind, "update")
 			if !cl.beginSync.Load() {
 				return
 			}
-			cl.queue.Push(func() error {
+			cl.queue.Push(&queue.RagTask{Task: func() error {
 				return h.onEvent(old, cur, model.EventUpdate)
-			})
+			}, Type: kind + "-cache-update"})
+			cl.queue.IncrementType(kind + "-cache-update")
 		},
 		DeleteFunc: func(obj any) {
 			incrementEvent(kind, "delete")
 			if !cl.beginSync.Load() {
 				return
 			}
-			cl.queue.Push(func() error {
+			cl.queue.Push(&queue.RagTask{Task: func() error {
 				return h.onEvent(nil, obj, model.EventDelete)
-			})
+			}, Type: kind + "-cache-delete"})
+			cl.queue.IncrementType(kind + "-cache-delete")
 		},
 	})
 	return h
