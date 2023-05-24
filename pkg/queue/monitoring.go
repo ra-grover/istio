@@ -18,7 +18,7 @@ var (
 	nameTag = monitoring.MustCreateLabel("name")
 
 	queue = monitoring.NewGauge(
-		"workqueue_deapth",
+		"workqueue_depth",
 		"number of items in the queue.",
 		monitoring.WithLabels(nameTag),
 	)
