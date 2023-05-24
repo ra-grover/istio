@@ -145,7 +145,7 @@ func (q *queueImpl) processNextItem() bool {
 	}
 
 	// Run the task.
-	log.Infof("Dequeuing task %s , process time %d", task.Type, time.Since(task.Start).Microseconds())
+	log.Infof("Dequeuing task %s , process time %d, queue length: ", task.Type, time.Since(task.Start).Microseconds(), len(q.tasks))
 	q.DecrementType(task.Type)
 
 	if time.Since(q.queueLastInfoed).Seconds() > 20 {
