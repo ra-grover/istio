@@ -144,7 +144,7 @@ func (q *queueImpl) processNextItem() bool {
 		log.Infof("Task came to be nil with type %s", task.Type)
 		return true
 	}
-
+	startTime := time.Now()
 	if err := task.Task(); err != nil {
 		delay := q.delay
 		log.Infof("Work item handle failed (%v), retry after delay %v", err, delay)
@@ -152,6 +152,8 @@ func (q *queueImpl) processNextItem() bool {
 			q.Push(task)
 		})
 	}
+	durationCallback := time.Since(startTime).Seconds()
+	callBackTime.With(nameTag.Value(task.Type)).Record(durationCallback)
 	return true
 }
 

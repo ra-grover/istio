@@ -22,10 +22,17 @@ var (
 		"number of items in the queue.",
 		monitoring.WithLabels(nameTag),
 	)
+
+	callBackTime = monitoring.NewGauge(
+		"callback_time",
+		"duration it takes to call the dequed callback",
+		monitoring.WithLabels(nameTag),
+	)
 )
 
 func init() {
 	monitoring.MustRegister(
 		queue,
+		callBackTime,
 	)
 }
