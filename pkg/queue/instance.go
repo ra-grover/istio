@@ -153,6 +153,7 @@ func (q *queueImpl) processNextItem() bool {
 		})
 	}
 	durationCallback := time.Since(startTime).Seconds()
+	log.Infof("Dequeued task %s , took %f (secs)", task.Type, durationCallback)
 	callBackTime.With(nameTag.Value(task.Type)).Record(durationCallback)
 	return true
 }
