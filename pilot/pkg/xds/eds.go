@@ -16,6 +16,7 @@ package xds
 
 import (
 	"fmt"
+	"time"
 
 	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
@@ -67,15 +68,20 @@ func (s *DiscoveryServer) EDSUpdate(shard model.ShardKey, serviceName string, na
 ) {
 	inboundEDSUpdates.Increment()
 	// Update the endpoint shards
+
 	pushType := s.edsCacheUpdate(shard, serviceName, namespace, istioEndpoints)
+
 	if pushType == IncrementalPush || pushType == FullPush {
 		// Trigger a push
+		timeS := time.Now()
 		s.ConfigUpdate(&model.PushRequest{
 			Full:           pushType == FullPush,
 			ConfigsUpdated: sets.New(model.ConfigKey{Kind: kind.ServiceEntry, Name: serviceName, Namespace: namespace}),
 			Reason:         []model.TriggerReason{model.EndpointUpdate},
 		})
+		log.Infof("The s.ConfigUpdate took %f secs", time.Since(timeS).Seconds())
 	}
+
 }
 
 // EDSCacheUpdate computes destination address membership across all clusters and networks.

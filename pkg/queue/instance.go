@@ -15,6 +15,7 @@
 package queue
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -143,6 +144,9 @@ func (q *queueImpl) processNextItem() bool {
 	if task.Task == nil {
 		log.Infof("Task came to be nil with type %s", task.Type)
 		return true
+	}
+	if task.Type == "EndpointSlice-update" {
+		fmt.Println("Bugger")
 	}
 	startTime := time.Now()
 	if err := task.Task(); err != nil {

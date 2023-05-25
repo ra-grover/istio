@@ -18,6 +18,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"time"
 
 	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pilot/pkg/model"
@@ -63,8 +64,13 @@ func (e *kubeEndpoints) Run(stopCh <-chan struct{}) {
 // processEndpointEvent triggers the config update.
 func processEndpointEvent(c *Controller, epc kubeEndpointsController, name string, namespace string, event model.Event, ep any) error {
 	// Update internal endpoint cache no matter what kind of service, even headless service.
-	// As for gateways, the cluster discovery type is `EDS` for headless service.
+	// As for gateways, the cluster discovery type is `EDS` for headless service
+	tme := time.Now()
 	updateEDS(c, epc, ep, event)
+	go func(tm time.Time) {
+		log.Infof("updateEDs took %f (secs)", time.Since(tm).Seconds())
+	}(tme)
+	tme = time.Now()
 	if svc, _ := c.serviceLister.Services(namespace).Get(name); svc != nil {
 		// if the service is headless service, trigger a full push if EnableHeadlessService is true,
 		// otherwise push endpoint updates - needed for NDS output.
@@ -81,13 +87,15 @@ func processEndpointEvent(c *Controller, epc kubeEndpointsController, name strin
 			}
 		}
 	}
-
+	go func(tm time.Time) {
+		log.Infof("serviceLister took %f (secs)", time.Since(tm).Seconds())
+	}(tme)
 	return nil
 }
 
 func updateEDS(c *Controller, epc kubeEndpointsController, ep any, event model.Event) {
 	namespacedName := epc.getServiceNamespacedName(ep)
-	log.Debugf("Handle EDS endpoint %s %s in namespace %s", namespacedName.Name, event, namespacedName.Namespace)
+	log.Infof("Handle EDS endpoint %s %s in namespace %s", namespacedName.Name, event, namespacedName.Namespace)
 	var forgottenEndpointsByHost map[host.Name][]*model.IstioEndpoint
 	if event == model.EventDelete {
 		forgottenEndpointsByHost = epc.forgetEndpoint(ep)
@@ -113,8 +121,11 @@ func updateEDS(c *Controller, epc kubeEndpointsController, ep any, event model.E
 					namespacedName.Namespace, namespacedName.Name)
 			}
 		}
-
+		timeS := time.Now()
 		c.opts.XDSUpdater.EDSUpdate(shard, string(hostName), namespacedName.Namespace, endpoints)
+		go func(time2 time.Time) {
+			log.Infof("The XDSUpdater.EDSUpdate took %f secs", time.Since(time2).Seconds())
+		}(timeS)
 	}
 }
 
